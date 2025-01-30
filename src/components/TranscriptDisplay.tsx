@@ -5,9 +5,10 @@ import { useToast } from "@/hooks/use-toast"
 
 interface TranscriptDisplayProps {
   transcript: string
+  suggestions: string
 }
 
-export function TranscriptDisplay({ transcript }: TranscriptDisplayProps) {
+export function TranscriptDisplay({ transcript, suggestions }: TranscriptDisplayProps) {
   const { toast } = useToast()
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -40,35 +41,46 @@ export function TranscriptDisplay({ transcript }: TranscriptDisplayProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Transcript</h2>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">{transcript.split(/\s+/).length} words</span>
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Transcript</h2>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{transcript.split(/\s+/).length} words</span>
+        </div>
+
+        <div className="rounded-md p-4 max-h-96 overflow-y-auto">
+          <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{transcript}</p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={copyToClipboard}>
+            <Copy className="h-4 w-4 mr-2" />
+            Copy
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadTxt} disabled={isDownloading}>
+            {isDownloading ? (
+              <>
+                <Download className="h-4 w-4 mr-2 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-md p-4 max-h-96 overflow-y-auto">
-        <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{transcript}</p>
-      </div>
-
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={copyToClipboard}>
-          <Copy className="h-4 w-4 mr-2" />
-          Copy
-        </Button>
-        <Button variant="outline" size="sm" onClick={downloadTxt} disabled={isDownloading}>
-          {isDownloading ? (
-            <>
-              <Download className="h-4 w-4 mr-2 animate-spin" />
-              Downloading...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </>
-          )}
-        </Button>
-      </div>
+      {suggestions && (
+        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
+          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Suggestions</h2>
+          <div className="rounded-md p-4 max-h-96 overflow-y-auto">
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{suggestions}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

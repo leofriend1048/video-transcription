@@ -11,8 +11,10 @@ import { FileHistory } from "@/components/FileHistory"
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [transcript, setTranscript] = useState<string>("")
+  const [suggestions, setSuggestions] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [executionUuid, setExecutionUuid] = useState<string | null>(null)
+  const [suggestionsUuid, setSuggestionsUuid] = useState<string | null>(null)
   const { toast } = useToast()
   const [history, setHistory] = useState<Array<{ name: string; date: Date }>>([])
 
@@ -41,8 +43,42 @@ export default function Home() {
         console.log("Polling Transcript Data:", resultData)
 
         if (resultData.status === "success" || resultData.status === "failed") {
-          setTranscript(resultData.output || "No transcript available")
-          setIsLoading(false)
+          const transcriptText = resultData.output || "No transcript available"
+          setTranscript(transcriptText)
+          
+          // Make the second AirOps call for suggestions
+          try {
+            const suggestionsResponse = await fetch(
+              "https://api.airops.com/public_api/airops_apps/4b582737-a30b-48cf-8d51-21dd402a4892/async_execute",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  inputs: {
+                    text: transcriptText,
+                  },
+                }),
+              }
+            )
+
+            if (!suggestionsResponse.ok) {
+              throw new Error("Failed to get suggestions")
+            }
+
+            const suggestionsData = await suggestionsResponse.json()
+            setSuggestionsUuid(suggestionsData.airops_app_execution.id)
+          } catch (error) {
+            console.error("Error getting suggestions:", error)
+            toast({
+              title: "Error",
+              description: "Failed to get suggestions.",
+              variant: "destructive",
+            })
+          }
+
           setExecutionUuid(null) // Clear the executionUuid to stop polling
         } else {
           setTimeout(pollForTranscript, 5000)
@@ -60,6 +96,51 @@ export default function Home() {
 
     pollForTranscript()
   }, [executionUuid, toast])
+
+  useEffect(() => {
+    const pollForSuggestions = async () => {
+      if (!suggestionsUuid) return
+
+      try {
+        const resultResponse = await fetch(
+          `https://api.airops.com/public_api/airops_apps/executions/${suggestionsUuid}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
+            },
+          },
+        )
+
+        console.log("Polling Suggestions Response:", resultResponse)
+
+        if (!resultResponse.ok) {
+          throw new Error("Failed to get suggestions result")
+        }
+
+        const resultData = await resultResponse.json()
+        console.log("Polling Suggestions Data:", resultData)
+
+        if (resultData.status === "success" || resultData.status === "failed") {
+          setSuggestions(resultData.output || "No suggestions available")
+          setSuggestionsUuid(null) // Clear the suggestionsUuid to stop polling
+          setIsLoading(false)
+        } else {
+          setTimeout(pollForSuggestions, 5000)
+        }
+      } catch (error) {
+        console.error("Error:", error)
+        toast({
+          title: "Error",
+          description: "An error occurred while polling for suggestions.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+      }
+    }
+
+    pollForSuggestions()
+  }, [suggestionsUuid, toast])
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
@@ -149,7 +230,7 @@ export default function Home() {
             </Button>
           </div>
 
-          {transcript && <TranscriptDisplay transcript={transcript} />}
+          {transcript && <TranscriptDisplay transcript={transcript} suggestions={suggestions} />}
 
           {history.length > 0 && (
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
@@ -162,4 +243,3 @@ export default function Home() {
     </div>
   )
 }
-
