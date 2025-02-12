@@ -57,7 +57,6 @@ export function FileUpload({ onFileSelect, onUrlInput }: FileUploadProps) {
           className="w-full"
         />
       </div>
-
       {selectedFile && <p className="text-sm text-zinc-500 dark:text-zinc-400">Selected file: {selectedFile.name}</p>}
       {url && <p className="text-sm text-zinc-500 dark:text-zinc-400">Selected URL: {url}</p>}
     </div>

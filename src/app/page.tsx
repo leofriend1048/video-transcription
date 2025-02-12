@@ -171,7 +171,7 @@ export default function Home() {
         const formData = new FormData()
         formData.append("file", file)
 
-        const uploadResponse = await fetch("https://api.airops.com/public_api/workspace_files", {
+        const uploadResponse = await fetch("https://app.airops.com/public_api/workspace_files", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
@@ -179,64 +179,34 @@ export default function Home() {
           body: formData,
         })
 
-        if (!uploadResponse.ok) {
-          const errorText = await uploadResponse.text()
-          throw new Error(`File upload failed: ${errorText}`)
-        }
+        if (!uploadResponse.ok) throw new Error("File upload failed")
 
         const uploadData = await uploadResponse.json()
         fileId = uploadData.id
       } else {
         // Handle URL input
-        try {
-          // First, fetch the file from the URL with CORS mode
-          const fileResponse = await fetch(url, {
-            mode: 'cors',
-            headers: {
-              'Accept': 'audio/*, video/*, application/octet-stream'
-            }
-          })
+        const uploadResponse = await fetch("https://api.airops.com/public_api/workspace_files", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            source_url: url,
+            name: url.split('/').pop() || 'video',
+          }),
+        })
 
-          if (!fileResponse.ok) {
-            throw new Error(`Failed to fetch file from URL: ${fileResponse.statusText}`)
-          }
+        console.log('URL Upload Response:', await uploadResponse.clone().text())
 
-          const contentType = fileResponse.headers.get('content-type')
-          if (!contentType || (!contentType.includes('audio/') && !contentType.includes('video/'))) {
-            throw new Error('Invalid file type. URL must point to an audio or video file.')
-          }
-
-          const blob = await fileResponse.blob()
-          const fileName = url.split('/').pop() || 'video'
-          
-          // Create a File object from the blob
-          const file = new File([blob], fileName, { type: contentType })
-          
-          // Upload the file using FormData
-          const formData = new FormData()
-          formData.append("file", file)
-
-          const uploadResponse = await fetch("https://api.airops.com/public_api/workspace_files", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
-            },
-            body: formData,
-          })
-
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text()
-            throw new Error(`Upload failed: ${errorText}`)
-          }
-
-          const uploadData = await uploadResponse.json()
-          fileId = uploadData.id
-        } catch (error) {
-          if (error instanceof Error) {
-            throw new Error(`URL processing failed: ${error.message}`)
-          }
-          throw error
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text()
+          console.error('URL Upload Error:', errorText)
+          throw new Error(`URL upload failed: ${errorText}`)
         }
+
+        const uploadData = await uploadResponse.json()
+        fileId = uploadData.id
       }
 
       const asyncExecuteResponse = await fetch(
@@ -296,6 +266,14 @@ export default function Home() {
               {isLoading ? "Processing..." : "Transcribe"}
             </Button>
           </div>
+          <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+              <iframe 
+                src="https://www.loom.com/embed/6bbb85194a7f43f88ef6b40cc9c5f630?sid=b1963e3a-241e-4daa-a3d8-a592f36d4b9c" 
+                frameBorder="0" 
+                allowFullScreen 
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+              />
+            </div>
 
           {transcript && <TranscriptDisplay transcript={transcript} suggestions={suggestions} />}
 
