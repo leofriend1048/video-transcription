@@ -10,6 +10,7 @@ import { FileHistory } from "@/components/FileHistory"
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
+  const [url, setUrl] = useState<string>("")
   const [transcript, setTranscript] = useState<string>("")
   const [suggestions, setSuggestions] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
@@ -142,15 +143,19 @@ export default function Home() {
     pollForSuggestions()
   }, [suggestionsUuid, toast])
 
-  const handleFileSelect = (selectedFile: File) => {
+  const handleFileSelect = (selectedFile: File | null) => {
     setFile(selectedFile)
   }
 
+  const handleUrlInput = (inputUrl: string) => {
+    setUrl(inputUrl)
+  }
+
   const handleSubmit = async () => {
-    if (!file) {
+    if (!file && !url) {
       toast({
-        title: "No file selected",
-        description: "Please select an MP3 or MP4 file to transcribe.",
+        title: "No input selected",
+        description: "Please select a file or enter a video URL to transcribe.",
         variant: "destructive",
       })
       return
@@ -159,21 +164,80 @@ export default function Home() {
     setIsLoading(true)
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      let fileId: string
 
-      const uploadResponse = await fetch("https://app.airops.com/public_api/workspace_files", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
-        },
-        body: formData,
-      })
+      if (file) {
+        // Handle file upload
+        const formData = new FormData()
+        formData.append("file", file)
 
-      if (!uploadResponse.ok) throw new Error("File upload failed")
+        const uploadResponse = await fetch("https://api.airops.com/public_api/workspace_files", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
+          },
+          body: formData,
+        })
 
-      const uploadData = await uploadResponse.json()
-      const fileId = uploadData.id
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text()
+          throw new Error(`File upload failed: ${errorText}`)
+        }
+
+        const uploadData = await uploadResponse.json()
+        fileId = uploadData.id
+      } else {
+        // Handle URL input
+        try {
+          // First, fetch the file from the URL with CORS mode
+          const fileResponse = await fetch(url, {
+            mode: 'cors',
+            headers: {
+              'Accept': 'audio/*, video/*, application/octet-stream'
+            }
+          })
+
+          if (!fileResponse.ok) {
+            throw new Error(`Failed to fetch file from URL: ${fileResponse.statusText}`)
+          }
+
+          const contentType = fileResponse.headers.get('content-type')
+          if (!contentType || (!contentType.includes('audio/') && !contentType.includes('video/'))) {
+            throw new Error('Invalid file type. URL must point to an audio or video file.')
+          }
+
+          const blob = await fileResponse.blob()
+          const fileName = url.split('/').pop() || 'video'
+          
+          // Create a File object from the blob
+          const file = new File([blob], fileName, { type: contentType })
+          
+          // Upload the file using FormData
+          const formData = new FormData()
+          formData.append("file", file)
+
+          const uploadResponse = await fetch("https://api.airops.com/public_api/workspace_files", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIROPS_API_KEY}`,
+            },
+            body: formData,
+          })
+
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text()
+            throw new Error(`Upload failed: ${errorText}`)
+          }
+
+          const uploadData = await uploadResponse.json()
+          fileId = uploadData.id
+        } catch (error) {
+          if (error instanceof Error) {
+            throw new Error(`URL processing failed: ${error.message}`)
+          }
+          throw error
+        }
+      }
 
       const asyncExecuteResponse = await fetch(
         "https://api.airops.com/public_api/airops_apps/adf8f6f5-515d-4f60-9a58-9ae51a3218ec/async_execute",
@@ -197,12 +261,15 @@ export default function Home() {
       setExecutionUuid(asyncExecuteData.airops_app_execution.id)
 
       // Add to history
-      setHistory((prev) => [...prev, { name: file.name, date: new Date() }])
+      setHistory((prev) => [...prev, { 
+        name: file ? file.name : url,
+        date: new Date() 
+      }])
     } catch (error) {
       console.error("Error:", error)
       toast({
         title: "Error",
-        description: "An error occurred while processing the file.",
+        description: error instanceof Error ? error.message : "An error occurred while processing the input.",
         variant: "destructive",
       })
       setIsLoading(false)
@@ -216,16 +283,16 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-medium text-zinc-900 dark:text-zinc-50">Audio Transcription</h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              Upload MP3 or MP4 files to generate transcripts
+              Upload MP3/MP4 files or enter a video URL to generate transcripts
             </p>
           </div>
 
           <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6">
-            <FileUpload onFileSelect={handleFileSelect} />
+            <FileUpload onFileSelect={handleFileSelect} onUrlInput={handleUrlInput} />
 
-            {isLoading && <p className="text-sm text-zinc-500 dark:text-zinc-400">Processing file...</p>}
+            {isLoading && <p className="text-sm text-zinc-500 dark:text-zinc-400">Processing input...</p>}
 
-            <Button onClick={handleSubmit} disabled={!file || isLoading} className="w-full">
+            <Button onClick={handleSubmit} disabled={(!file && !url) || isLoading} className="w-full">
               {isLoading ? "Processing..." : "Transcribe"}
             </Button>
           </div>

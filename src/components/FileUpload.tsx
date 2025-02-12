@@ -3,11 +3,13 @@ import { Input } from "@/components/ui/input"
 import { Upload } from "lucide-react"
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void
+  onFileSelect: (file: File | null) => void
+  onUrlInput: (url: string) => void
 }
 
-export function FileUpload({ onFileSelect }: FileUploadProps) {
+export function FileUpload({ onFileSelect, onUrlInput }: FileUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [url, setUrl] = useState("")
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -15,10 +17,20 @@ export function FileUpload({ onFileSelect }: FileUploadProps) {
       if (file.type === "audio/mpeg" || file.type === "video/mp4") {
         setSelectedFile(file)
         onFileSelect(file)
+        setUrl("") // Clear URL when file is selected
+        onUrlInput("") // Reset URL in parent
       } else {
         alert("Please select an MP3 or MP4 file.")
       }
     }
+  }
+
+  const handleUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value
+    setUrl(newUrl)
+    onUrlInput(newUrl)
+    setSelectedFile(null) // Clear file when URL is input
+    onFileSelect(null) // Reset file in parent
   }
 
   return (
@@ -34,8 +46,20 @@ export function FileUpload({ onFileSelect }: FileUploadProps) {
         </div>
         <Input id="file-upload" type="file" accept=".mp3,.mp4" onChange={handleFileChange} className="hidden" />
       </label>
-      {selectedFile && <p className="text-sm text-zinc-500 dark:text-zinc-400">Selected: {selectedFile.name}</p>}
+      
+      <div className="space-y-2">
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">Or enter a video URL:</p>
+        <Input
+          type="url"
+          placeholder="Enter video source URL"
+          value={url}
+          onChange={handleUrlChange}
+          className="w-full"
+        />
+      </div>
+
+      {selectedFile && <p className="text-sm text-zinc-500 dark:text-zinc-400">Selected file: {selectedFile.name}</p>}
+      {url && <p className="text-sm text-zinc-500 dark:text-zinc-400">Selected URL: {url}</p>}
     </div>
   )
 }
-
